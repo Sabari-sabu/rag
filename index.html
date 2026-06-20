@@ -3,343 +3,737 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="RAG PDF Q&A — Upload PDFs and ask questions using AI" />
     <title>RAG PDF Q&A</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
     <style>
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
+      *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+      :root {
+        --sidebar-bg: #141414;
+        --sidebar-width: 160px;
+        --main-bg: #e8e4d8;
+        --card-bg: #f0ece2;
+        --card-border: #2a2a2a;
+        --lime: #c8f73a;
+        --lime-dark: #a8d420;
+        --text-dark: #1a1a1a;
+        --text-muted: #666;
+        --text-sidebar: #ccc;
+        --mono: 'IBM Plex Mono', monospace;
+        --sans: 'Inter', sans-serif;
+        --radius: 4px;
+        --header-h: 48px;
       }
+
+      html, body { height: 100%; }
 
       body {
-        font-family:
-          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        min-height: 100vh;
+        font-family: var(--sans);
+        background: var(--main-bg);
+        color: var(--text-dark);
         display: flex;
-        justify-content: center;
-        align-items: center;
-        padding: 20px;
+        height: 100vh;
+        overflow: hidden;
       }
 
-      .container {
-        background: white;
-        border-radius: 12px;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-        max-width: 800px;
-        width: 100%;
-        padding: 40px;
+      /* ── SIDEBAR ──────────────────────────────── */
+      .sidebar {
+        width: var(--sidebar-width);
+        min-width: var(--sidebar-width);
+        background: var(--sidebar-bg);
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        position: fixed;
+        left: 0; top: 0;
+        z-index: 100;
+        transition: transform 0.3s ease;
       }
 
-      h1 {
-        color: #333;
-        margin-bottom: 10px;
-        text-align: center;
-      }
-
-      .subtitle {
-        color: #666;
-        text-align: center;
-        margin-bottom: 30px;
+      .sidebar-logo {
+        padding: 14px 16px;
+        font-family: var(--mono);
         font-size: 14px;
-      }
-
-      .section {
-        margin-bottom: 40px;
-      }
-
-      .section-title {
-        color: #667eea;
-        font-size: 18px;
         font-weight: 600;
-        margin-bottom: 15px;
+        color: #fff;
+        border-bottom: 1px solid #2a2a2a;
         display: flex;
         align-items: center;
         gap: 8px;
+        height: var(--header-h);
       }
 
-      .upload-area {
-        border: 2px dashed #ddd;
-        border-radius: 8px;
-        padding: 30px;
-        text-align: center;
-        transition: all 0.3s;
+      .sidebar-logo span { color: var(--lime); }
+
+      .sidebar-cta {
+        margin: 14px 12px;
+        background: var(--lime);
+        color: #000;
+        border: none;
+        border-radius: var(--radius);
+        padding: 8px 12px;
+        font-family: var(--mono);
+        font-size: 12px;
+        font-weight: 600;
         cursor: pointer;
-      }
-
-      .upload-area:hover {
-        border-color: #667eea;
-        background: #f8f9ff;
-      }
-
-      .upload-area.dragover {
-        border-color: #667eea;
-        background: #f0f3ff;
-      }
-
-      .upload-area input {
-        display: none;
-      }
-
-      .upload-icon {
-        font-size: 32px;
-        margin-bottom: 10px;
-      }
-
-      .upload-area p {
-        color: #666;
-        margin-bottom: 5px;
-      }
-
-      .upload-area span {
-        color: #667eea;
-        font-weight: 500;
-      }
-
-      .files-list {
-        display: grid;
-        gap: 10px;
-      }
-
-      .file-item {
-        background: #f8f9ff;
-        padding: 12px 15px;
-        border-radius: 6px;
         display: flex;
-        justify-content: space-between;
         align-items: center;
-        border-left: 3px solid #667eea;
+        gap: 6px;
+        transition: background 0.2s;
+        white-space: nowrap;
+      }
+      .sidebar-cta:hover { background: var(--lime-dark); }
+
+      .sidebar-nav { flex: 1; padding: 8px 0; }
+
+      .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 16px;
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--text-sidebar);
+        cursor: pointer;
+        transition: color 0.2s, background 0.2s;
+        text-decoration: none;
+      }
+      .nav-item:hover { color: #fff; background: rgba(255,255,255,0.06); }
+      .nav-item.active { color: #fff; }
+      .nav-item svg { width: 14px; height: 14px; opacity: 0.7; flex-shrink: 0; }
+
+      .sidebar-divider { border: none; border-top: 1px solid #2a2a2a; margin: 8px 0; }
+
+      .sidebar-footer { padding: 12px 0 8px; }
+
+      /* ── MAIN WRAPPER ─────────────────────────── */
+      .main-wrapper {
+        margin-left: var(--sidebar-width);
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        overflow: hidden;
+      }
+
+      /* ── TOP BAR ──────────────────────────────── */
+      .topbar {
+        height: var(--header-h);
+        background: var(--main-bg);
+        border-bottom: 1px solid #ccc6b4;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 20px;
+        flex-shrink: 0;
+      }
+
+      .topbar-title {
+        font-family: var(--mono);
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-dark);
+      }
+
+      .topbar-badge {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: #555;
+        border: 1px solid #bbb;
+        border-radius: 20px;
+        padding: 3px 10px;
+        background: #fff;
+      }
+
+      .topbar-actions { display: flex; align-items: center; gap: 10px; }
+
+      .btn-lime {
+        background: var(--lime);
+        color: #000;
+        border: none;
+        border-radius: var(--radius);
+        padding: 7px 14px;
+        font-family: var(--mono);
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s, transform 0.1s;
+        white-space: nowrap;
+      }
+      .btn-lime:hover { background: var(--lime-dark); }
+      .btn-lime:active { transform: scale(0.97); }
+      .btn-lime:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+      .btn-outline {
+        background: transparent;
+        color: var(--text-dark);
+        border: 1px solid #bbb;
+        border-radius: var(--radius);
+        padding: 6px 12px;
+        font-family: var(--mono);
+        font-size: 12px;
+        cursor: pointer;
+        transition: border-color 0.2s, background 0.2s;
+        white-space: nowrap;
+      }
+      .btn-outline:hover { border-color: #888; background: rgba(0,0,0,0.04); }
+
+      /* ── CONTENT AREA ─────────────────────────── */
+      .content {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      /* ── APP DESCRIPTION ──────────────────────── */
+      .app-desc {
+        padding: 4px 2px 8px;
+      }
+      .app-desc h2 {
+        font-family: var(--mono);
+        font-size: 15px;
+        font-weight: 600;
+        margin-bottom: 6px;
+      }
+      .app-desc p {
+        font-size: 13px;
+        color: var(--text-muted);
+        line-height: 1.5;
+        max-width: 680px;
+      }
+
+      /* ── GRID ─────────────────────────────────── */
+      .widget-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+      }
+
+      .widget-full { grid-column: 1 / -1; }
+
+      /* ── WIDGET CARD ──────────────────────────── */
+      .widget {
+        background: #f5f1e6;
+        border: 1px solid var(--card-border);
+        border-radius: var(--radius);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .widget-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 9px 14px 8px;
+        border-bottom: 1px solid #d0cbbf;
+        background: #eee9db;
+      }
+
+      .widget-label {
+        font-family: var(--mono);
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text-dark);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .widget-icon { color: var(--text-muted); font-size: 13px; }
+
+      .widget-body { padding: 14px; flex: 1; }
+
+      /* ── UPLOAD ZONE ──────────────────────────── */
+      .upload-zone {
+        border: 1.5px dashed #aaa8a0;
+        border-radius: var(--radius);
+        padding: 28px 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        cursor: pointer;
+        transition: border-color 0.2s, background 0.2s;
+        text-align: center;
+        min-height: 130px;
+        position: relative;
+      }
+      .upload-zone:hover, .upload-zone.dragover {
+        border-color: #555;
+        background: rgba(0,0,0,0.03);
+      }
+      .upload-zone input { display: none; }
+
+      .upload-circle {
+        width: 40px; height: 40px;
+        border: 1.5px solid #888;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #888;
+      }
+
+      .upload-zone p {
+        font-family: var(--mono);
+        font-size: 12px;
+        color: #555;
+      }
+      .upload-zone small {
+        font-size: 11px;
+        color: #999;
+        line-height: 1.4;
+        max-width: 200px;
+      }
+
+      /* ── FILES LIST ───────────────────────────── */
+      .files-list { display: flex; flex-direction: column; gap: 8px; min-height: 130px; }
+
+      .file-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 10px;
+        background: #ede9da;
+        border: 1px solid #ccc8bc;
+        border-radius: var(--radius);
+        gap: 8px;
+      }
+
+      .file-info { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+
+      .file-dot {
+        width: 8px; height: 8px;
+        background: var(--lime);
+        border-radius: 50%;
+        flex-shrink: 0;
       }
 
       .file-name {
-        font-weight: 500;
-        color: #333;
-      }
-
-      .file-size {
-        color: #999;
-        font-size: 12px;
-      }
-
-      .form-group {
-        margin-bottom: 15px;
-      }
-
-      label {
-        display: block;
-        margin-bottom: 8px;
-        color: #333;
-        font-weight: 500;
-        font-size: 14px;
-      }
-
-      select,
-      input[type="text"],
-      textarea {
-        width: 100%;
-        padding: 10px 12px;
-        border: 1px solid #ddd;
-        border-radius: 6px;
-        font-family: inherit;
-        font-size: 14px;
-        transition: all 0.3s;
-      }
-
-      select:focus,
-      input[type="text"]:focus,
-      textarea:focus {
-        outline: none;
-        border-color: #667eea;
-        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-      }
-
-      textarea {
-        resize: vertical;
-        min-height: 80px;
-      }
-
-      button {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        border: none;
-        padding: 12px 24px;
-        border-radius: 6px;
-        font-weight: 600;
-        cursor: pointer;
-        transition:
-          transform 0.2s,
-          box-shadow 0.2s;
-        font-size: 14px;
-      }
-
-      button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
-      }
-
-      button:active {
-        transform: translateY(0);
-      }
-
-      button:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
-        transform: none;
-      }
-
-      .loading {
-        display: inline-block;
-        width: 12px;
-        height: 12px;
-        border: 2px solid #fff;
-        border-top-color: transparent;
-        border-radius: 50%;
-        animation: spin 0.8s linear infinite;
-      }
-
-      @keyframes spin {
-        to {
-          transform: rotate(360deg);
-        }
-      }
-
-      .answer-box {
-        background: #f8f9ff;
-        border-left: 4px solid #667eea;
-        padding: 20px;
-        border-radius: 6px;
-        margin-top: 20px;
-      }
-
-      .answer-title {
-        color: #667eea;
-        font-weight: 600;
-        margin-bottom: 10px;
-      }
-
-      .answer-text {
-        color: #333;
-        line-height: 1.6;
-        margin-bottom: 15px;
-      }
-
-      .sources-title {
-        color: #666;
-        font-weight: 500;
-        font-size: 13px;
-        margin-top: 15px;
-        margin-bottom: 8px;
-      }
-
-      .source-item {
-        background: white;
-        padding: 10px;
-        border-radius: 4px;
-        margin-bottom: 8px;
-        font-size: 13px;
-        color: #666;
-        max-height: 60px;
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--text-dark);
+        white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        border-left: 2px solid #ddd;
       }
 
-      .error {
-        background: #fee;
-        color: #c33;
-        padding: 12px 15px;
-        border-radius: 6px;
-        margin-bottom: 15px;
-        border-left: 3px solid #c33;
-        font-size: 14px;
-      }
+      .file-meta { font-size: 10px; color: #999; font-family: var(--mono); flex-shrink: 0; }
 
-      .success {
-        background: #efe;
-        color: #3c3;
-        padding: 12px 15px;
-        border-radius: 6px;
-        margin-bottom: 15px;
-        border-left: 3px solid #3c3;
+      .btn-remove {
+        background: none;
+        border: none;
+        color: #999;
+        cursor: pointer;
         font-size: 14px;
+        padding: 2px 4px;
+        border-radius: 2px;
+        line-height: 1;
+        flex-shrink: 0;
+        transition: color 0.2s;
       }
+      .btn-remove:hover { color: #333; }
 
       .no-files {
-        color: #999;
+        font-family: var(--mono);
+        font-size: 12px;
+        color: #aaa;
         text-align: center;
-        padding: 20px;
-        font-style: italic;
+        padding: 30px 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
       }
+
+      /* ── SELECT ───────────────────────────────── */
+      .styled-select {
+        width: 100%;
+        padding: 9px 12px;
+        border: 1px solid #ccc8bc;
+        border-radius: var(--radius);
+        background: #ede9da;
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--text-dark);
+        cursor: pointer;
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 10px center;
+        padding-right: 28px;
+        margin-bottom: 12px;
+      }
+      .styled-select:focus { outline: none; border-color: #888; }
+
+      /* ── TEXTAREA ─────────────────────────────── */
+      .styled-textarea {
+        width: 100%;
+        min-height: 100px;
+        padding: 10px 12px;
+        border: none;
+        background: transparent;
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--text-dark);
+        resize: vertical;
+        line-height: 1.6;
+        outline: none;
+      }
+      .styled-textarea::placeholder { color: #aaa; }
+
+      .textarea-footer {
+        padding: 8px 14px;
+        border-top: 1px solid #d0cbbf;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        background: #eee9db;
+      }
+
+      /* ── ANSWER WIDGET ────────────────────────── */
+      .answer-widget .widget-header {
+        background: var(--lime);
+        border-bottom-color: var(--lime-dark);
+      }
+      .answer-widget .widget-label { color: #000; }
+      .answer-widget .widget-icon { color: #333; }
+
+      .answer-text {
+        font-size: 13px;
+        line-height: 1.7;
+        color: var(--text-dark);
+        font-family: var(--sans);
+        white-space: pre-wrap;
+        min-height: 60px;
+      }
+
+      .answer-placeholder {
+        font-family: var(--mono);
+        font-size: 12px;
+        color: #aaa;
+        min-height: 60px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      /* ── SOURCES ──────────────────────────────── */
+      .sources-section { margin-top: 14px; padding-top: 12px; border-top: 1px solid #d0cbbf; }
+
+      .sources-label {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: #888;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .source-chip {
+        background: #ede9da;
+        border: 1px solid #ccc8bc;
+        border-radius: var(--radius);
+        padding: 7px 10px;
+        font-size: 11px;
+        color: #666;
+        line-height: 1.4;
+        margin-bottom: 6px;
+        font-family: var(--sans);
+        border-left: 3px solid var(--lime-dark);
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+
+      /* ── TOAST ────────────────────────────────── */
+      .toast-container {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        z-index: 999;
+        pointer-events: none;
+      }
+
+      .toast {
+        font-family: var(--mono);
+        font-size: 12px;
+        padding: 10px 16px;
+        border-radius: var(--radius);
+        border: 1px solid;
+        background: #fff;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        animation: slideIn 0.2s ease;
+        pointer-events: auto;
+        max-width: 320px;
+      }
+      .toast.success { border-color: var(--lime-dark); color: #2a5a00; background: #f4ffdb; }
+      .toast.error   { border-color: #cc3333; color: #8a0000; background: #fff5f5; }
+      .toast.loading { border-color: #aaa; color: #555; }
+
+      @keyframes slideIn {
+        from { opacity: 0; transform: translateX(20px); }
+        to   { opacity: 1; transform: translateX(0); }
+      }
+
+      /* ── SPINNER ──────────────────────────────── */
+      .spinner {
+        display: inline-block;
+        width: 11px; height: 11px;
+        border: 1.5px solid currentColor;
+        border-top-color: transparent;
+        border-radius: 50%;
+        animation: spin 0.7s linear infinite;
+        flex-shrink: 0;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+
+      /* ── HAMBURGER (mobile) ───────────────────── */
+      .hamburger {
+        display: none;
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: var(--text-dark);
+        padding: 4px;
+      }
+
+      .sidebar-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 99;
+      }
+
+      /* ── RESPONSIVE ───────────────────────────── */
+      @media (max-width: 768px) {
+        .sidebar {
+          transform: translateX(-100%);
+        }
+        .sidebar.open {
+          transform: translateX(0);
+        }
+        .sidebar-overlay.open {
+          display: block;
+        }
+        .main-wrapper {
+          margin-left: 0;
+        }
+        .hamburger {
+          display: flex;
+          align-items: center;
+        }
+        .widget-grid {
+          grid-template-columns: 1fr;
+        }
+        .topbar { padding: 0 14px; }
+        .content { padding: 14px; }
+        .topbar-badge { display: none; }
+      }
+
+      @media (max-width: 480px) {
+        .topbar-title { font-size: 12px; }
+        .btn-lime, .btn-outline { font-size: 11px; padding: 6px 10px; }
+        .content { padding: 10px; gap: 10px; }
+      }
+
+      /* ── SCROLLBAR ────────────────────────────── */
+      .content::-webkit-scrollbar { width: 6px; }
+      .content::-webkit-scrollbar-track { background: transparent; }
+      .content::-webkit-scrollbar-thumb { background: #ccc8bc; border-radius: 3px; }
     </style>
   </head>
   <body>
-    <div class="container">
-      <h1>📄 RAG PDF Q&A</h1>
-      <p class="subtitle">Upload PDFs and ask questions about their content</p>
 
-      <div id="message"></div>
+    <!-- Sidebar Overlay (mobile) -->
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
 
-      <!-- Upload Section -->
-      <div class="section">
-        <div class="section-title">📤 Upload PDF</div>
-        <div class="upload-area" id="uploadArea">
-          <div class="upload-icon">📁</div>
-          <p>Drag and drop your PDF here</p>
-          <p>or <span>click to select</span></p>
-          <input type="file" id="fileInput" accept=".pdf" />
-        </div>
+    <!-- ── SIDEBAR ── -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-logo">
+        <span>◈</span> RAG<span>.ai</span>
       </div>
 
-      <!-- Files List Section -->
-      <div class="section">
-        <div class="section-title">📚 Your Documents</div>
-        <div id="filesList" class="files-list">
-          <div class="no-files">No documents uploaded yet</div>
-        </div>
-      </div>
+      <button class="sidebar-cta">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        New Session
+      </button>
 
-      <!-- Q&A Section -->
-      <div class="section">
-        <div class="section-title">❓ Ask a Question</div>
-        <div class="form-group">
-          <label for="fileSelect">Select Document:</label>
-          <select id="fileSelect">
-            <option value="">Choose a document...</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label for="queryInput">Your Question:</label>
-          <textarea
-            id="queryInput"
-            placeholder="Ask anything about the selected document..."
-          ></textarea>
-        </div>
-        <button id="askBtn" onclick="askQuestion()" disabled>
-          Ask Question
-        </button>
-      </div>
+      <nav class="sidebar-nav">
+        <a class="nav-item active" href="#">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+          Home
+        </a>
+        <a class="nav-item" href="#">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Documents
+        </a>
+        <a class="nav-item" href="#">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          History
+        </a>
 
-      <!-- Answer Section -->
-      <div id="answerSection" style="display: none">
-        <div class="answer-box">
-          <div class="answer-title">Answer:</div>
-          <div id="answerText" class="answer-text"></div>
-          <div class="sources-title">📌 Source excerpts:</div>
-          <div id="sources"></div>
-        </div>
+        <hr class="sidebar-divider" />
+
+        <a class="nav-item" href="#">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          Help
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <hr class="sidebar-divider" />
+        <a class="nav-item" href="#">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          Guest
+        </a>
       </div>
+    </aside>
+
+    <!-- ── MAIN CONTENT ── -->
+    <div class="main-wrapper">
+
+      <!-- Top Bar -->
+      <header class="topbar">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <button class="hamburger" id="hamburgerBtn" onclick="openSidebar()" aria-label="Menu">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          </button>
+          <span class="topbar-title">PDF Q&amp;A Assistant</span>
+        </div>
+        <div class="topbar-actions">
+          <span class="topbar-badge">Powered by Claude AI</span>
+          <button class="btn-outline" onclick="clearAll()">Clear All</button>
+        </div>
+      </header>
+
+      <!-- Content -->
+      <main class="content">
+
+        <!-- App description -->
+        <div class="app-desc">
+          <h2>📄 RAG PDF Q&amp;A Assistant</h2>
+          <p>Upload PDF documents and ask questions. The AI finds relevant sections and generates accurate answers based on your document content.</p>
+        </div>
+
+        <!-- Toast container -->
+        <div class="toast-container" id="toastContainer"></div>
+
+        <!-- Row 1: Upload + Documents -->
+        <div class="widget-grid">
+
+          <!-- Upload Widget -->
+          <div class="widget">
+            <div class="widget-header">
+              <span class="widget-label">
+                <span class="widget-icon">📤</span> Upload PDF
+              </span>
+            </div>
+            <div class="widget-body">
+              <div class="upload-zone" id="uploadZone">
+                <input type="file" id="fileInput" accept=".pdf" />
+                <div class="upload-circle">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 19V6M5 12l7-7 7 7"/></svg>
+                </div>
+                <p>Upload your PDF here</p>
+                <small>Supports PDF files. Content is stored locally in your browser.</small>
+              </div>
+            </div>
+          </div>
+
+          <!-- Documents Widget -->
+          <div class="widget">
+            <div class="widget-header">
+              <span class="widget-label">
+                <span class="widget-icon">📚</span> Your Documents
+              </span>
+              <span id="docCount" style="font-family:var(--mono);font-size:11px;color:#888;"></span>
+            </div>
+            <div class="widget-body">
+              <div class="files-list" id="filesList">
+                <div class="no-files">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                  No documents uploaded yet
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 2: Question Widget -->
+        <div class="widget widget-full">
+          <div class="widget-header">
+            <span class="widget-label">
+              <span class="widget-icon">❓</span> Your Question
+            </span>
+            <span style="font-size:11px;color:#999;font-family:var(--mono);">→</span>
+          </div>
+          <div class="widget-body" style="padding:0;">
+            <select class="styled-select" id="fileSelect" style="margin:12px 14px 0;width:calc(100% - 28px);">
+              <option value="">→ Select a document first...</option>
+            </select>
+            <textarea
+              class="styled-textarea"
+              id="queryInput"
+              placeholder="→ Enter your specific question here..."
+            ></textarea>
+          </div>
+          <div class="textarea-footer">
+            <button class="btn-lime" id="askBtn" onclick="askQuestion()" disabled>
+              Ask Question →
+            </button>
+          </div>
+        </div>
+
+        <!-- Row 3: Answer Widget -->
+        <div class="widget widget-full answer-widget" id="answerWidget">
+          <div class="widget-header">
+            <span class="widget-label">
+              <span>✦</span> AI-Generated Answer
+            </span>
+            <button class="btn-outline" id="copyBtn" onclick="copyAnswer()" style="display:none;font-size:11px;padding:4px 8px;border-color:#aaa8a0;">Copy</button>
+          </div>
+          <div class="widget-body">
+            <div class="answer-placeholder" id="answerPlaceholder">
+              <span>→</span> Answer will appear here after you ask a question...
+            </div>
+            <div class="answer-text" id="answerText" style="display:none;"></div>
+            <div class="sources-section" id="sourcesSection" style="display:none;">
+              <div class="sources-label">📌 Source excerpts</div>
+              <div id="sources"></div>
+            </div>
+          </div>
+        </div>
+
+      </main>
     </div>
 
     <script>
-      // Auto-detect API URL: use relative path on Vercel, localhost for dev
-      const API_URL = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+      // ─── Config ─────────────────────────────────────────────────────────
+      const API_URL = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
         ? "http://localhost:5000/api"
         : "/api";
 
-      // ─── localStorage helpers ───────────────────────────────────────────
+      // ─── LocalStorage helpers ────────────────────────────────────────────
       function saveChunks(filename, chunks) {
         const stored = getStoredFiles();
-        stored[filename] = { chunks, size: chunks.join(' ').length };
+        stored[filename] = { chunks, count: chunks.length, addedAt: Date.now() };
         localStorage.setItem('rag_files', JSON.stringify(stored));
       }
 
@@ -349,8 +743,7 @@
       }
 
       function getChunks(filename) {
-        const stored = getStoredFiles();
-        return stored[filename]?.chunks || [];
+        return getStoredFiles()[filename]?.chunks || [];
       }
 
       function deleteFile(filename) {
@@ -359,149 +752,203 @@
         localStorage.setItem('rag_files', JSON.stringify(stored));
       }
 
-      // ─── Upload ──────────────────────────────────────────────────────────
-      const uploadArea = document.getElementById("uploadArea");
-      const fileInput = document.getElementById("fileInput");
+      function clearAll() {
+        localStorage.removeItem('rag_files');
+        renderFileList();
+        document.getElementById('answerText').style.display = 'none';
+        document.getElementById('answerPlaceholder').style.display = 'flex';
+        document.getElementById('sourcesSection').style.display = 'none';
+        document.getElementById('copyBtn').style.display = 'none';
+        showToast('All documents cleared', 'success');
+      }
 
-      uploadArea.addEventListener("click", () => fileInput.click());
-      uploadArea.addEventListener("dragover", (e) => { e.preventDefault(); uploadArea.classList.add("dragover"); });
-      uploadArea.addEventListener("dragleave", () => uploadArea.classList.remove("dragover"));
-      uploadArea.addEventListener("drop", (e) => {
+      // ─── Upload ──────────────────────────────────────────────────────────
+      const uploadZone = document.getElementById('uploadZone');
+      const fileInput  = document.getElementById('fileInput');
+
+      uploadZone.addEventListener('click', () => fileInput.click());
+      uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+      uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+      uploadZone.addEventListener('drop', e => {
         e.preventDefault();
-        uploadArea.classList.remove("dragover");
+        uploadZone.classList.remove('dragover');
         if (e.dataTransfer.files[0]) { fileInput.files = e.dataTransfer.files; uploadFile(); }
       });
-      fileInput.addEventListener("change", uploadFile);
+      fileInput.addEventListener('change', uploadFile);
 
       async function uploadFile() {
         const file = fileInput.files[0];
         if (!file) return;
 
         const formData = new FormData();
-        formData.append("file", file);
+        formData.append('file', file);
 
+        const toastId = showToast(`Uploading ${file.name}...`, 'loading', 0);
         try {
-          showMessage(`Uploading ${file.name}...`, "loading");
-          const response = await fetch(`${API_URL}/upload`, { method: "POST", body: formData });
-          const data = await response.json();
+          const res  = await fetch(`${API_URL}/upload`, { method: 'POST', body: formData });
+          const data = await res.json();
+          removeToast(toastId);
 
-          if (response.ok) {
-            // ✅ Save chunks to localStorage (works on Vercel — no server storage needed)
+          if (res.ok) {
             saveChunks(data.filename, data.chunks);
-            showMessage(`✓ "${data.filename}" uploaded successfully (${data.count} chunks)`, "success");
-            fileInput.value = "";
+            showToast(`✓ "${data.filename}" processed (${data.count} chunks)`, 'success');
+            fileInput.value = '';
             renderFileList();
           } else {
-            showMessage(`✗ Error: ${data.error}`, "error");
+            showToast(`✗ ${data.error}`, 'error');
           }
-        } catch (error) {
-          showMessage(`✗ Upload failed: ${error.message}`, "error");
+        } catch (err) {
+          removeToast(toastId);
+          showToast(`✗ Upload failed: ${err.message}`, 'error');
         }
       }
 
-      // ─── File list (from localStorage) ──────────────────────────────────
+      // ─── File list ───────────────────────────────────────────────────────
       function renderFileList() {
         const stored = getStoredFiles();
-        const files = Object.entries(stored);
-        const filesList = document.getElementById("filesList");
-        const fileSelect = document.getElementById("fileSelect");
+        const files  = Object.entries(stored);
+        const list   = document.getElementById('filesList');
+        const select = document.getElementById('fileSelect');
+        const count  = document.getElementById('docCount');
 
-        fileSelect.innerHTML = '<option value="">Choose a document...</option>';
+        select.innerHTML = '<option value="">→ Select a document first...</option>';
+        count.textContent = files.length ? `${files.length} file${files.length > 1 ? 's' : ''}` : '';
 
         if (files.length > 0) {
-          filesList.innerHTML = files.map(([name, info]) => `
-            <div class="file-item">
-              <div>
-                <div class="file-name">📄 ${name}</div>
-                <div class="file-size">${info.chunks?.length || 0} chunks stored</div>
+          list.innerHTML = files.map(([name, info]) => `
+            <div class="file-row">
+              <div class="file-info">
+                <div class="file-dot"></div>
+                <div class="file-name" title="${name}">${name}</div>
               </div>
-              <button onclick="removeFile('${name}')" style="background:none;border:1px solid #ccc;color:#666;padding:4px 8px;font-size:12px;border-radius:4px;cursor:pointer;transform:none;box-shadow:none;">✕</button>
-            </div>`).join("");
+              <span class="file-meta">${info.count} chunks</span>
+              <button class="btn-remove" onclick="removeFile('${name}')" title="Remove">✕</button>
+            </div>`).join('');
 
           files.forEach(([name]) => {
-            const option = document.createElement("option");
-            option.value = name;
-            option.textContent = name;
-            fileSelect.appendChild(option);
+            const opt = document.createElement('option');
+            opt.value = name;
+            opt.textContent = name;
+            select.appendChild(opt);
           });
         } else {
-          filesList.innerHTML = '<div class="no-files">No documents uploaded yet</div>';
+          list.innerHTML = `<div class="no-files">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            No documents uploaded yet
+          </div>`;
         }
+        updateAskBtn();
       }
 
       function removeFile(filename) {
         deleteFile(filename);
         renderFileList();
-        showMessage(`"${filename}" removed`, "success");
+        showToast(`"${filename}" removed`, 'success');
       }
 
-      // ─── Ask question ────────────────────────────────────────────────────
+      // ─── Ask ─────────────────────────────────────────────────────────────
+      document.getElementById('fileSelect').addEventListener('change', updateAskBtn);
+      document.getElementById('queryInput').addEventListener('input', updateAskBtn);
+
+      function updateAskBtn() {
+        const hasFile  = !!document.getElementById('fileSelect').value;
+        const hasQuery = !!document.getElementById('queryInput').value.trim();
+        document.getElementById('askBtn').disabled = !(hasFile && hasQuery);
+      }
+
       async function askQuestion() {
-        const fileSelect = document.getElementById("fileSelect");
-        const queryInput = document.getElementById("queryInput");
-        const filename = fileSelect.value;
-        const query = queryInput.value.trim();
+        const filename = document.getElementById('fileSelect').value;
+        const query    = document.getElementById('queryInput').value.trim();
+        const chunks   = getChunks(filename);
 
-        if (!filename || !query) {
-          showMessage("Please select a document and enter a question", "error");
-          return;
-        }
-
-        // Get chunks from localStorage
-        const chunks = getChunks(filename);
         if (!chunks.length) {
-          showMessage("No chunks found — please re-upload the PDF", "error");
+          showToast('No chunks found — please re-upload the PDF', 'error');
           return;
         }
+
+        const askBtn = document.getElementById('askBtn');
+        askBtn.disabled = true;
+        askBtn.innerHTML = '<span class="spinner"></span> Thinking...';
+
+        // Reset answer area
+        document.getElementById('answerText').style.display = 'none';
+        document.getElementById('answerPlaceholder').style.display = 'flex';
+        document.getElementById('answerPlaceholder').innerHTML = '<span class="spinner"></span> Generating answer...';
+        document.getElementById('sourcesSection').style.display = 'none';
+        document.getElementById('copyBtn').style.display = 'none';
 
         try {
-          const askBtn = document.getElementById("askBtn");
-          askBtn.disabled = true;
-          askBtn.innerHTML = '<span class="loading"></span> Thinking...';
-
-          const response = await fetch(`${API_URL}/ask`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            // ✅ Send chunks in the request body (stateless — works on Vercel)
+          const res  = await fetch(`${API_URL}/ask`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ query, chunks }),
           });
+          const data = await res.json();
 
-          const data = await response.json();
+          if (res.ok) {
+            document.getElementById('answerPlaceholder').style.display = 'none';
+            const answerEl = document.getElementById('answerText');
+            answerEl.textContent = data.answer;
+            answerEl.style.display = 'block';
 
-          if (response.ok) {
-            document.getElementById("answerText").textContent = data.answer;
-            const sourcesDiv = document.getElementById("sources");
-            sourcesDiv.innerHTML = data.sources
-              .map((source) => `<div class="source-item">${source}</div>`)
-              .join("");
-            document.getElementById("answerSection").style.display = "block";
+            const sourcesDiv = document.getElementById('sources');
+            sourcesDiv.innerHTML = data.sources.map(s => `<div class="source-chip">${s}</div>`).join('');
+            document.getElementById('sourcesSection').style.display = 'block';
+            document.getElementById('copyBtn').style.display = 'inline-flex';
+
+            // Scroll answer into view
+            document.getElementById('answerWidget').scrollIntoView({ behavior: 'smooth', block: 'start' });
           } else {
-            showMessage(`✗ Error: ${data.error}`, "error");
+            document.getElementById('answerPlaceholder').innerHTML = `<span style="color:#c33;">✗ ${data.error}</span>`;
           }
-        } catch (error) {
-          showMessage(`✗ Failed to get answer: ${error.message}`, "error");
+        } catch (err) {
+          document.getElementById('answerPlaceholder').innerHTML = `<span style="color:#c33;">✗ ${err.message}</span>`;
         } finally {
-          const askBtn = document.getElementById("askBtn");
           askBtn.disabled = false;
-          askBtn.innerHTML = "Ask Question";
+          askBtn.innerHTML = 'Ask Question →';
+          updateAskBtn();
         }
       }
 
-      document.getElementById("fileSelect").addEventListener("change", () => {
-        document.getElementById("askBtn").disabled = !document.getElementById("fileSelect").value;
-      });
-
-      function showMessage(text, type) {
-        const messageDiv = document.getElementById("message");
-        if (type === "loading") {
-          messageDiv.innerHTML = `<div class="success"><span class="loading"></span> ${text}</div>`;
-        } else {
-          messageDiv.innerHTML = `<div class="${type}">${text}</div>`;
-        }
-        setTimeout(() => { if (type !== "error") messageDiv.innerHTML = ""; }, 5000);
+      function copyAnswer() {
+        const text = document.getElementById('answerText').textContent;
+        navigator.clipboard.writeText(text).then(() => showToast('Copied to clipboard ✓', 'success'));
       }
 
-      // Load files from localStorage on page load
+      // ─── Toast system ────────────────────────────────────────────────────
+      let toastCounter = 0;
+
+      function showToast(message, type = 'success', duration = 4000) {
+        const id = `toast-${++toastCounter}`;
+        const container = document.getElementById('toastContainer');
+        const icon = type === 'loading' ? '<span class="spinner"></span>'
+                   : type === 'success' ? '✓'
+                   : '✗';
+        const el = document.createElement('div');
+        el.className = `toast ${type}`;
+        el.id = id;
+        el.innerHTML = `${icon} ${message}`;
+        container.appendChild(el);
+        if (duration > 0) setTimeout(() => removeToast(id), duration);
+        return id;
+      }
+
+      function removeToast(id) {
+        const el = document.getElementById(id);
+        if (el) el.remove();
+      }
+
+      // ─── Sidebar (mobile) ────────────────────────────────────────────────
+      function openSidebar() {
+        document.getElementById('sidebar').classList.add('open');
+        document.getElementById('sidebarOverlay').classList.add('open');
+      }
+      function closeSidebar() {
+        document.getElementById('sidebar').classList.remove('open');
+        document.getElementById('sidebarOverlay').classList.remove('open');
+      }
+
+      // ─── Init ────────────────────────────────────────────────────────────
       renderFileList();
     </script>
   </body>
