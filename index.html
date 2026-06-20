@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RAG PDF Q&A</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+      }
+
+      .container {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        max-width: 800px;
+        width: 100%;
+        padding: 40px;
+      }
+
+      h1 {
+        color: #333;
+        margin-bottom: 10px;
+        text-align: center;
+      }
+
+      .subtitle {
+        color: #666;
+        text-align: center;
+        margin-bottom: 30px;
+        font-size: 14px;
+      }
+
+      .section {
+        margin-bottom: 40px;
+      }
+
+      .section-title {
+        color: #667eea;
+        font-size: 18px;
+        font-weight: 600;
+        margin-bottom: 15px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .upload-area {
+        border: 2px dashed #ddd;
+        border-radius: 8px;
+        padding: 30px;
+        text-align: center;
+        transition: all 0.3s;
+        cursor: pointer;
+      }
+
+      .upload-area:hover {
+        border-color: #667eea;
+        background: #f8f9ff;
+      }
+
+      .upload-area.dragover {
+        border-color: #667eea;
+        background: #f0f3ff;
+      }
+
+      .upload-area input {
+        display: none;
+      }
+
+      .upload-icon {
+        font-size: 32px;
+        margin-bottom: 10px;
+      }
+
+      .upload-area p {
+        color: #666;
+        margin-bottom: 5px;
+      }
+
+      .upload-area span {
+        color: #667eea;
+        font-weight: 500;
+      }
+
+      .files-list {
+        display: grid;
+        gap: 10px;
+      }
+
+      .file-item {
+        background: #f8f9ff;
+        padding: 12px 15px;
+        border-radius: 6px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-left: 3px solid #667eea;
+      }
+
+      .file-name {
+        font-weight: 500;
+        color: #333;
+      }
+
+      .file-size {
+        color: #999;
+        font-size: 12px;
+      }
+
+      .form-group {
+        margin-bottom: 15px;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 8px;
+        color: #333;
+        font-weight: 500;
+        font-size: 14px;
+      }
+
+      select,
+      input[type="text"],
+      textarea {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        font-family: inherit;
+        font-size: 14px;
+        transition: all 0.3s;
+      }
+
+      select:focus,
+      input[type="text"]:focus,
+      textarea:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+      }
+
+      textarea {
+        resize: vertical;
+        min-height: 80px;
+      }
+
+      button {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 6px;
+        font-weight: 600;
+        cursor: pointer;
+        transition:
+          transform 0.2s,
+          box-shadow 0.2s;
+        font-size: 14px;
+      }
+
+      button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+      }
+
+      button:active {
+        transform: translateY(0);
+      }
+
+      button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .loading {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border: 2px solid #fff;
+        border-top-color: transparent;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .answer-box {
+        background: #f8f9ff;
+        border-left: 4px solid #667eea;
+        padding: 20px;
+        border-radius: 6px;
+        margin-top: 20px;
+      }
+
+      .answer-title {
+        color: #667eea;
+        font-weight: 600;
+        margin-bottom: 10px;
+      }
+
+      .answer-text {
+        color: #333;
+        line-height: 1.6;
+        margin-bottom: 15px;
+      }
+
+      .sources-title {
+        color: #666;
+        font-weight: 500;
+        font-size: 13px;
+        margin-top: 15px;
+        margin-bottom: 8px;
+      }
+
+      .source-item {
+        background: white;
+        padding: 10px;
+        border-radius: 4px;
+        margin-bottom: 8px;
+        font-size: 13px;
+        color: #666;
+        max-height: 60px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        border-left: 2px solid #ddd;
+      }
+
+      .error {
+        background: #fee;
+        color: #c33;
+        padding: 12px 15px;
+        border-radius: 6px;
+        margin-bottom: 15px;
+        border-left: 3px solid #c33;
+        font-size: 14px;
+      }
+
+      .success {
+        background: #efe;
+        color: #3c3;
+        padding: 12px 15px;
+        border-radius: 6px;
+        margin-bottom: 15px;
+        border-left: 3px solid #3c3;
+        font-size: 14px;
+      }
+
+      .no-files {
+        color: #999;
+        text-align: center;
+        padding: 20px;
+        font-style: italic;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>📄 RAG PDF Q&A</h1>
+      <p class="subtitle">Upload PDFs and ask questions about their content</p>
+
+      <div id="message"></div>
+
+      <!-- Upload Section -->
+      <div class="section">
+        <div class="section-title">📤 Upload PDF</div>
+        <div class="upload-area" id="uploadArea">
+          <div class="upload-icon">📁</div>
+          <p>Drag and drop your PDF here</p>
+          <p>or <span>click to select</span></p>
+          <input type="file" id="fileInput" accept=".pdf" />
+        </div>
+      </div>
+
+      <!-- Files List Section -->
+      <div class="section">
+        <div class="section-title">📚 Your Documents</div>
+        <div id="filesList" class="files-list">
+          <div class="no-files">No documents uploaded yet</div>
+        </div>
+      </div>
+
+      <!-- Q&A Section -->
+      <div class="section">
+        <div class="section-title">❓ Ask a Question</div>
+        <div class="form-group">
+          <label for="fileSelect">Select Document:</label>
+          <select id="fileSelect">
+            <option value="">Choose a document...</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="queryInput">Your Question:</label>
+          <textarea
+            id="queryInput"
+            placeholder="Ask anything about the selected document..."
+          ></textarea>
+        </div>
+        <button id="askBtn" onclick="askQuestion()" disabled>
+          Ask Question
+        </button>
+      </div>
+
+      <!-- Answer Section -->
+      <div id="answerSection" style="display: none">
+        <div class="answer-box">
+          <div class="answer-title">Answer:</div>
+          <div id="answerText" class="answer-text"></div>
+          <div class="sources-title">📌 Source excerpts:</div>
+          <div id="sources"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Auto-detect API URL: use relative path on Vercel, localhost for dev
+      const API_URL = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+        ? "http://localhost:5000/api"
+        : "/api";
+
+      // ─── localStorage helpers ───────────────────────────────────────────
+      function saveChunks(filename, chunks) {
+        const stored = getStoredFiles();
+        stored[filename] = { chunks, size: chunks.join(' ').length };
+        localStorage.setItem('rag_files', JSON.stringify(stored));
+      }
+
+      function getStoredFiles() {
+        try { return JSON.parse(localStorage.getItem('rag_files') || '{}'); }
+        catch { return {}; }
+      }
+
+      function getChunks(filename) {
+        const stored = getStoredFiles();
+        return stored[filename]?.chunks || [];
+      }
+
+      function deleteFile(filename) {
+        const stored = getStoredFiles();
+        delete stored[filename];
+        localStorage.setItem('rag_files', JSON.stringify(stored));
+      }
+
+      // ─── Upload ──────────────────────────────────────────────────────────
+      const uploadArea = document.getElementById("uploadArea");
+      const fileInput = document.getElementById("fileInput");
+
+      uploadArea.addEventListener("click", () => fileInput.click());
+      uploadArea.addEventListener("dragover", (e) => { e.preventDefault(); uploadArea.classList.add("dragover"); });
+      uploadArea.addEventListener("dragleave", () => uploadArea.classList.remove("dragover"));
+      uploadArea.addEventListener("drop", (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove("dragover");
+        if (e.dataTransfer.files[0]) { fileInput.files = e.dataTransfer.files; uploadFile(); }
+      });
+      fileInput.addEventListener("change", uploadFile);
+
+      async function uploadFile() {
+        const file = fileInput.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append("file", file);
+
+        try {
+          showMessage(`Uploading ${file.name}...`, "loading");
+          const response = await fetch(`${API_URL}/upload`, { method: "POST", body: formData });
+          const data = await response.json();
+
+          if (response.ok) {
+            // ✅ Save chunks to localStorage (works on Vercel — no server storage needed)
+            saveChunks(data.filename, data.chunks);
+            showMessage(`✓ "${data.filename}" uploaded successfully (${data.count} chunks)`, "success");
+            fileInput.value = "";
+            renderFileList();
+          } else {
+            showMessage(`✗ Error: ${data.error}`, "error");
+          }
+        } catch (error) {
+          showMessage(`✗ Upload failed: ${error.message}`, "error");
+        }
+      }
+
+      // ─── File list (from localStorage) ──────────────────────────────────
+      function renderFileList() {
+        const stored = getStoredFiles();
+        const files = Object.entries(stored);
+        const filesList = document.getElementById("filesList");
+        const fileSelect = document.getElementById("fileSelect");
+
+        fileSelect.innerHTML = '<option value="">Choose a document...</option>';
+
+        if (files.length > 0) {
+          filesList.innerHTML = files.map(([name, info]) => `
+            <div class="file-item">
+              <div>
+                <div class="file-name">📄 ${name}</div>
+                <div class="file-size">${info.chunks?.length || 0} chunks stored</div>
+              </div>
+              <button onclick="removeFile('${name}')" style="background:none;border:1px solid #ccc;color:#666;padding:4px 8px;font-size:12px;border-radius:4px;cursor:pointer;transform:none;box-shadow:none;">✕</button>
+            </div>`).join("");
+
+          files.forEach(([name]) => {
+            const option = document.createElement("option");
+            option.value = name;
+            option.textContent = name;
+            fileSelect.appendChild(option);
+          });
+        } else {
+          filesList.innerHTML = '<div class="no-files">No documents uploaded yet</div>';
+        }
+      }
+
+      function removeFile(filename) {
+        deleteFile(filename);
+        renderFileList();
+        showMessage(`"${filename}" removed`, "success");
+      }
+
+      // ─── Ask question ────────────────────────────────────────────────────
+      async function askQuestion() {
+        const fileSelect = document.getElementById("fileSelect");
+        const queryInput = document.getElementById("queryInput");
+        const filename = fileSelect.value;
+        const query = queryInput.value.trim();
+
+        if (!filename || !query) {
+          showMessage("Please select a document and enter a question", "error");
+          return;
+        }
+
+        // Get chunks from localStorage
+        const chunks = getChunks(filename);
+        if (!chunks.length) {
+          showMessage("No chunks found — please re-upload the PDF", "error");
+          return;
+        }
+
+        try {
+          const askBtn = document.getElementById("askBtn");
+          askBtn.disabled = true;
+          askBtn.innerHTML = '<span class="loading"></span> Thinking...';
+
+          const response = await fetch(`${API_URL}/ask`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            // ✅ Send chunks in the request body (stateless — works on Vercel)
+            body: JSON.stringify({ query, chunks }),
+          });
+
+          const data = await response.json();
+
+          if (response.ok) {
+            document.getElementById("answerText").textContent = data.answer;
+            const sourcesDiv = document.getElementById("sources");
+            sourcesDiv.innerHTML = data.sources
+              .map((source) => `<div class="source-item">${source}</div>`)
+              .join("");
+            document.getElementById("answerSection").style.display = "block";
+          } else {
+            showMessage(`✗ Error: ${data.error}`, "error");
+          }
+        } catch (error) {
+          showMessage(`✗ Failed to get answer: ${error.message}`, "error");
+        } finally {
+          const askBtn = document.getElementById("askBtn");
+          askBtn.disabled = false;
+          askBtn.innerHTML = "Ask Question";
+        }
+      }
+
+      document.getElementById("fileSelect").addEventListener("change", () => {
+        document.getElementById("askBtn").disabled = !document.getElementById("fileSelect").value;
+      });
+
+      function showMessage(text, type) {
+        const messageDiv = document.getElementById("message");
+        if (type === "loading") {
+          messageDiv.innerHTML = `<div class="success"><span class="loading"></span> ${text}</div>`;
+        } else {
+          messageDiv.innerHTML = `<div class="${type}">${text}</div>`;
+        }
+        setTimeout(() => { if (type !== "error") messageDiv.innerHTML = ""; }, 5000);
+      }
+
+      // Load files from localStorage on page load
+      renderFileList();
+    </script>
+  </body>
+</html>

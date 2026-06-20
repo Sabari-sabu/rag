@@ -1,0 +1,28 @@
+{
+  "name": "rag-pdf-qa",
+  "version": "1.0.0",
+  "description": "RAG PDF Q&A Application - Upload PDFs and ask questions using Claude AI",
+  "main": "app.py",
+  "scripts": {
+    "dev": "python app.py",
+    "start": "python app.py",
+    "setup": "python -m pip install -r requirements.txt",
+    "setup-win": "python -m pip install -r requirements.txt",
+    "test": "echo \"Testing endpoints...\" && node -e \"fetch('http://localhost:5000/api/health').then(r => r.json()).then(d => console.log('Server health:', d)).catch(e => console.log('Server not running'))\""
+  },
+  "keywords": [
+    "rag",
+    "pdf",
+    "claude",
+    "ai",
+    "question-answering"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=14.0.0",
+    "python": ">=3.8"
+  },
+  "devDependencies": {},
+  "dependencies": {}
+}
